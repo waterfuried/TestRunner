@@ -25,12 +25,12 @@ public class Main {
      * @param methods - массив методов класса
      * @return
      *      0, если в классе есть методы с аннотацией Test
-     *      1, если в классе есть метод с аннотацией BeforeSuite
-     *      2, если в классе есть метод с аннотацией BeforeSuite
+     *      ANNOTATION_BEFORE, если в классе есть метод с аннотацией BeforeSuite
+     *      ANNOTATION_AFTER, если в классе есть метод с аннотацией BeforeSuite
      *
-     *      -1, если в классе более одного метода с аннотацией BeforeSuite
-     *      -2, если в классе более одного метода с аннотацией AfterSuite
-     *      -4, если в классе нет методов с аннотацией Test
+     *      -ANNOTATION_BEFORE, если в классе более одного метода с аннотацией BeforeSuite
+     *      -ANNOTATION_AFTER, если в классе более одного метода с аннотацией AfterSuite
+     *      -ANNOTATION_TEST, если в классе нет методов с аннотацией Test
      */
     static int checkValidity(Method[] methods) {
         boolean beforeSuite, afterSuite, test;
@@ -39,31 +39,32 @@ public class Main {
 
         for (Method m : methods) {
             if (m.getAnnotation(MarkedAnnotation.BeforeSuite.class) != null)
-                if (beforeSuite) res = -1; else beforeSuite = true;
+                if (beforeSuite) res = -MarkedAnnotation.ANNOTATION_BEFORE; else beforeSuite = true;
             if (m.getAnnotation(MarkedAnnotation.AfterSuite.class) != null)
-                if (afterSuite) res = -2; else afterSuite = true;
+                if (afterSuite) res = -MarkedAnnotation.ANNOTATION_AFTER; else afterSuite = true;
             if (m.getAnnotation(MarkedAnnotation.Test.class) != null) test = true;
         }
         if (!test)
-            res = -4;
-        else {
-            if (beforeSuite) res += 1;
-            if (afterSuite) res += 2;
+            res -= MarkedAnnotation.ANNOTATION_TEST;
+        else if (res == 0) {
+            if (beforeSuite) res += MarkedAnnotation.ANNOTATION_BEFORE;
+            if (afterSuite) res += MarkedAnnotation.ANNOTATION_AFTER;
         }
         return res;
     }
 
     static void startActions(Method[] methods) throws RuntimeException {
         int v = checkValidity(methods);
-        if (v < 0)
-            if (v == -4)
-                throw new RuntimeException("Класс не содержит методов с аннотацией @Test");
+        if (v < 0) {
+            v = Math.abs(v);
+            if ((v & MarkedAnnotation.ANNOTATION_TEST) == MarkedAnnotation.ANNOTATION_TEST)
+                throw new RuntimeException("Класс не содержит методы с аннотацией @Test");
             else
                 throw new RuntimeException("Класс содержит более одного метода с аннотацией @" +
-                    (v == -1 ? "BeforeSuite" : "AfterSuite"));
-        else {
+                        (v == MarkedAnnotation.ANNOTATION_BEFORE ? "BeforeSuite" : "AfterSuite"));
+        } else {
             // выполнить метод с аннотацией BeforeSuite
-            if ((v & 1) == 1)
+            if ((v & MarkedAnnotation.ANNOTATION_BEFORE) == MarkedAnnotation.ANNOTATION_BEFORE)
                 for (Method m : methods)
                     if (m.getAnnotation(MarkedAnnotation.BeforeSuite.class) != null)
                         try { m.invoke(null); }
@@ -91,7 +92,7 @@ public class Main {
             } while (minIdx >= 0);
 
             // выполнить метод с аннотацией AfterSuite
-            if ((v & 2) == 2)
+            if ((v & MarkedAnnotation.ANNOTATION_AFTER) == MarkedAnnotation.ANNOTATION_AFTER)
                 for (Method m : methods)
                     if (m.getAnnotation(MarkedAnnotation.AfterSuite.class) != null)
                         try { m.invoke(null); }
